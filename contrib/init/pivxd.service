@@ -1,0 +1,26 @@
+[Unit]
+Description=PIVX's distributed currency daemon
+After=network.target
+
+[Service]
+User=dstra
+Group=dstra
+
+Type=forking
+PIDFile=/var/lib/dstrad/dstrad.pid
+
+ExecStart=/usr/bin/dstrad -daemon -pid=/var/lib/dstrad/dstrad.pid \
+          -conf=/etc/dstra/dstra.conf -datadir=/var/lib/dstrad
+
+ExecStop=-/usr/bin/dstra-cli -conf=/etc/dstra/dstra.conf \
+         -datadir=/var/lib/dstrad stop
+
+Restart=always
+PrivateTmp=true
+TimeoutStopSec=60s
+TimeoutStartSec=2s
+StartLimitInterval=120s
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

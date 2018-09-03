@@ -1,0 +1,26 @@
+# /etc/conf.d/dstrad: config file for /etc/init.d/dstrad
+
+# Config file location
+#BITCOIND_CONFIGFILE="/etc/dstra/dstra.conf"
+
+# What directory to write pidfile to?  (created and owned by $BITCOIND_USER)
+#BITCOIND_PIDDIR="/var/run/dstrad"
+
+# What filename to give the pidfile
+#BITCOIND_PIDFILE="${BITCOIND_PIDDIR}/dstrad.pid"
+
+# Where to write dstrad data (be mindful that the blockchain is large)
+#BITCOIND_DATADIR="/var/lib/dstrad"
+
+# User and group to own dstrad process
+#BITCOIND_USER="dstra"
+#BITCOIND_GROUP="dstra"
+
+# Path to dstrad executable
+#BITCOIND_BIN="/usr/bin/dstrad"
+
+# Nice value to run dstrad under
+#BITCOIND_NICE=0
+
+# Additional options (avoid -conf and -datadir, use flags above)
+BITCOIND_OPTS=""

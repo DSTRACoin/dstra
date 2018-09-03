@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=DSTRA
+Comment=DSTRA P2P Cryptocurrency
+Comment[fr]=DSTRA, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=DSTRA, eşten eşe kriptografik sanal para birimi
+Exec=dstra-qt %u
+Terminal=false
+Type=Application
+Icon=dstra128
+MimeType=x-scheme-handler/dstra;
+Categories=Office;Finance;
