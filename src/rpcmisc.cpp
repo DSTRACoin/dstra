@@ -111,6 +111,7 @@ Value getinfo(const Array& params, bool fHelp)
     else if (mapHashedBlocks.count(chainActive.Tip()->nHeight - 1) && nLastCoinStakeSearchInterval)
         nStaking = true;
     obj.push_back(Pair("staking status", (nStaking ? "Staking Active" : "Staking Not Active")));
+    obj.push_back(Pair("staking possibility", (nStaking ? dWalletStakePossibility : .0)));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     return obj;
 }
