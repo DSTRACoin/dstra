@@ -1,8 +1,8 @@
 package=freetype
-$(package)_version=2.6.3
-$(package)_download_path=http://download.savannah.gnu.org/releases/$(package)
+$(package)_version=2.9.1
+$(package)_download_path=http://download-mirror.savannah.gnu.org/releases/$(package)
 $(package)_file_name=$(package)-$($(package)_version).tar.bz2
-$(package)_sha256_hash=371e707aa522acf5b15ce93f11183c725b8ed1ee8546d7b3af549863045863a2
+$(package)_sha256_hash=db8d87ea720ea9d5edc5388fc7a0497bb11ba9fe972245e0f7f4c7e8b1e1e84d
 
 define $(package)_set_vars
   $(package)_config_opts=--without-zlib --without-png --disable-static
