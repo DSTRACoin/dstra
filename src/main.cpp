@@ -3373,7 +3373,7 @@ bool AcceptBlockHeader(const CBlock& block, CValidationState& state, CBlockIndex
     return true;
 }
 
-bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, CDiskBlockPos* dbp)
+bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, CDiskBlockPos* dbp, CNode* pfrom)
 {
     AssertLockHeld(cs_main);
 
@@ -3399,6 +3399,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     if (pindex->nStatus & BLOCK_HAVE_DATA) {
         // TODO: deal better with duplicate blocks.
         // return state.DoS(20, error("AcceptBlock() : already have block %d %s", pindex->nHeight, pindex->GetBlockHash().ToString()), REJECT_DUPLICATE, "duplicate");
+        LogPrintf("AcceptBlock() : already have block %d %s", pindex->nHeight, pindex->GetBlockHash().ToString());
         return true;
     }
 
@@ -3425,7 +3426,6 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 
         // Inputs
         std::vector<CTxIn> pivInputs;
-        std::vector<CTxIn> zPIVInputs;
 
         for (CTxIn stakeIn : stakeTxIn.vin) {
             pivInputs.push_back(stakeIn);
@@ -3434,12 +3434,12 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 
         // ZC started after PoS.
         // Check for serial double spent on the same block, TODO: Move this to the proper method..
-        for (CTransaction tx : block.vtx) {
-            for (CTxIn in: tx.vin) {
+        for (const CTransaction &tx : block.vtx) {
+            for (const CTxIn &in: tx.vin) {
                 if (tx.IsCoinStake()) continue;
                 if (hasPIVInputs)
                     // Check if coinstake input is double spent inside the same block
-                    for (CTxIn pivIn : pivInputs) {
+                    for (const CTxIn &pivIn : pivInputs) {
                         if (pivIn.prevout == in.prevout) {
                             // double spent coinstake input inside block
                             return error("%s: double spent coinstake input inside block", __func__);
@@ -3464,23 +3464,30 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
                     return error("%s: forked chain longer than maximum reorg limit", __func__);
                 }
 
-                if (!ReadBlockFromDisk(bl, prev))
+                if (!ReadBlockFromDisk(bl, prev)) {
                     // Previous block not on disk
-                    return error("%s: previous block %s not on disk", __func__, prev->GetBlockHash().GetHex());
+                    auto prevBlockHash = prev->GetBlockHash();
+                    if (pfrom) {
+                        pfrom->PushMessage("getblocks", chainActive.GetLocator(), prevBlockHash);
+                        pfrom->vBlockRequested.push_back(prevBlockHash);
+                        LogPrintf("%s: request block %s\n", __func__, prevBlockHash.GetHex());
+                    }
+                    return error("%s: previous block %s not on disk", __func__, prevBlockHash.GetHex());
+                }
+
                 // Increase amount of read blocks
                 readBlock++;
                 // Loop through every input from said block
-                for (CTransaction t : bl.vtx) {
-                    for (CTxIn in: t.vin) {
+                for (const CTransaction &t : bl.vtx) {
+                    for (const CTxIn &in: t.vin) {
                         // Loop through every input of the staking tx
-                        for (CTxIn stakeIn : pivInputs) {
+                        for (const CTxIn &stakeIn : pivInputs) {
                             // if it's already spent
 
                             // First regular staking check
                             if (hasPIVInputs) {
                                 if (stakeIn.prevout == in.prevout) {
-                                    return state.DoS(100,
-                                                     error("%s: input already spent on a previous block", __func__));
+                                    return state.DoS(100, error("%s: input already spent on a previous block", __func__));
                                 }
                             }
                         }
@@ -3497,13 +3504,12 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 
         // If the stake is not a zPoS then let's check if the inputs were spent on the main chain
         const CCoinsViewCache coins(pcoinsTip);
-        for (CTxIn in: stakeTxIn.vin) {
+        for (const CTxIn &in: stakeTxIn.vin) {
             const CCoins *coin = coins.AccessCoins(in.prevout.hash);
 
             if (!coin && !isBlockFromFork) {
                 // No coins on the main chain
-                return error("%s: coin stake inputs not available on main chain, received height %d vs current %d",
-                             __func__, nHeight, chainActive.Height());
+                return error("%s: coin stake inputs not available on main chain, received height %d vs current %d", __func__, nHeight, chainActive.Height());
             }
             if (coin && !coin->IsAvailable(in.prevout.n)) {
                 // If this is not available get the height of the spent and validate it with the forked height
@@ -3621,21 +3627,17 @@ bool ProcessNewBlock(CValidationState& state, CNode* pfrom, CBlock* pblock, CDis
         }
     }
 
-    while (true) {
-        TRY_LOCK(cs_main, lockMain);
-        if (!lockMain) {
-            MilliSleep(50);
-            continue;
-        }
+    {
+        LOCK(cs_main);   // Replaces the former TRY_LOCK loop because busy waiting wastes too much resources
 
         MarkBlockAsReceived(pblock->GetHash());
         if (!checked) {
-            return error("%s : CheckBlock FAILED", __func__);
+            return error("%s : CheckBlock FAILED for block %s", __func__, pblock->GetHash().GetHex());
         }
 
         // Store to disk
         CBlockIndex *pindex = nullptr;
-        bool ret = AcceptBlock(*pblock, state, &pindex, dbp);
+        bool ret = AcceptBlock(*pblock, state, &pindex, dbp, pfrom);
         if (pindex && pfrom) {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
         }
@@ -3661,7 +3663,6 @@ bool ProcessNewBlock(CValidationState& state, CNode* pfrom, CBlock* pblock, CDis
             }
             return error("%s : AcceptBlock FAILED", __func__);
         }
-        break;
     }
 
     if (!ActivateBestChain(state, pblock))
@@ -5287,21 +5288,24 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             pfrom->AddInventoryKnown(inv);
 
             CValidationState state;
-            ProcessNewBlock(state, pfrom, &block);
-            int nDoS;
-            if (state.IsInvalid(nDoS)) {
-                pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-                if (nDoS > 0) {
-                    TRY_LOCK(cs_main, lockMain);
-                    if (lockMain) Misbehaving(pfrom->GetId(), nDoS);
+            if (!mapBlockIndex.count(block.GetHash())) {
+                ProcessNewBlock(state, pfrom, &block);
+                int nDoS;
+                if (state.IsInvalid(nDoS)) {
+                    pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+                                       state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+                    if (nDoS > 0) {
+                        TRY_LOCK(cs_main, lockMain);
+                        if (lockMain) Misbehaving(pfrom->GetId(), nDoS);
+                    }
                 }
-
                 //disconnect this node if its old protocol version
                 pfrom->DisconnectOldProtocol(ActiveProtocol(), strCommand);
+            } else {
+                LogPrint("net", "%s : Already processed block %s, skipping ProcessNewBlock()\n", __func__,
+                         block.GetHash().GetHex());
             }
         }
-
     }
 
 
