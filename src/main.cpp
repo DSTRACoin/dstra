@@ -3467,6 +3467,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
                 if (!ReadBlockFromDisk(bl, prev)) {
                     // Previous block not on disk
                     auto prevBlockHash = prev->GetBlockHash();
+                    // FIXME: Is this really necessary?
                     if (pfrom) {
                         pfrom->PushMessage("getblocks", chainActive.GetLocator(), prevBlockHash);
                         pfrom->vBlockRequested.push_back(prevBlockHash);
@@ -3514,10 +3515,11 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
             if (coin && !coin->IsAvailable(in.prevout.n)) {
                 // If this is not available get the height of the spent and validate it with the forked height
                 // Check if this occurred before the chain split
-                if (!(isBlockFromFork && coin->nHeight > splitHeight)) {
-                    // Coins not available
-                    return error("%s: coin stake inputs already spent in main chain", __func__);
-                }
+                LogPrintf("%s: blockHash=%s isBlockFromFork=%s, coin->nHeight=%d, splitHeight=%d, coin->IsCoinStake()=%s\n", __func__, block.GetHash().GetHex(), isBlockFromFork ? "true" : "false", coin->nHeight, splitHeight, coin->IsCoinStake() ? "true" : "false");
+                // TODO: Improve workaround. Somebody stakes with the same wallet on several nodes, it causes stuck.
+                if (isBlockFromFork && (coin->nHeight > splitHeight || coin->IsCoinStake())) continue;
+                // Coins not available
+                return error("%s: coin stake inputs already spent in main chain", __func__);
             }
         }
     }
