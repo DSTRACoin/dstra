@@ -1,3 +1,3 @@
 80.211.201.116:15269
-ewvps3bd5t6gook6.onion
-7avqxclzx3pkeqrs.onion
+ewvps3bd5t6gook6.onion:15269
+7avqxclzx3pkeqrs.onion:15269
