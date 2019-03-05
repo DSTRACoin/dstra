@@ -141,7 +141,6 @@ public:
         assert(genesis.hashMerkleRoot == uint256("bc9d7507709a1941c27f8e426c1ab5bfb1c14579c09a8052be1658997b778966"));
 
         vSeeds.push_back(CDNSSeedData("dstra.io", "seeds.dstra.io"));
-        vSeeds.push_back(CDNSSeedData("happycat.gq", "dstra.happycat.gq"));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1, 30); // D 30, F 35
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1, 33); // E
@@ -210,7 +209,6 @@ public:
         vSeeds.clear();
 
         vSeeds.push_back(CDNSSeedData("dstra.io", "seeds-testnet.dstra.io"));
-        vSeeds.push_back(CDNSSeedData("happycat.gq", "tdstra.happycat.gq"));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1, 65); // T
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1, 68); // U
